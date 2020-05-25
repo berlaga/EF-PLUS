@@ -6,6 +6,8 @@ namespace AuditDemo
     using System.ComponentModel.DataAnnotations;
     using System.ComponentModel.DataAnnotations.Schema;
 
+    using Z.EntityFramework.Plus;
+
     public class School : DbContext
     {
         // Your context has been configured to use a 'School' connection string from your application's 
@@ -18,6 +20,37 @@ namespace AuditDemo
             : base("name=School")
         {
             Database.SetInitializer<School>(new SchoolDBIni<School>());
+
+            AuditManager.DefaultConfiguration.AutoSavePreAction = (context, audit) => {
+                var customAuditEntries = new List<CustomAudit>();
+
+                foreach (var auditEntry in audit.Entries)
+                {
+                    var customAuditEntry = new CustomAudit();
+                    customAuditEntries.Add(customAuditEntry);
+
+                    customAuditEntry.EntitySetName = auditEntry.EntitySetName;
+                    customAuditEntry.EntityTypeName = auditEntry.EntityTypeName;
+                    customAuditEntry.StateName = auditEntry.StateName;
+                    customAuditEntry.CreatedBy = auditEntry.CreatedBy;
+                    customAuditEntry.CreatedDate = auditEntry.CreatedDate;
+
+                    if(auditEntry.EntityTypeName == "Enrollment")
+                    {
+                        var record = ((School)context).SchoolStatistics.Find(1);
+                        record.EnrolmentCount++;
+                    }
+
+                    if (auditEntry.EntityTypeName == "Student")
+                    {
+                        var record = ((School)context).SchoolStatistics.Find(1);
+                        record.StudentCount++;
+                    }
+
+                }
+
+                 ((School)context).CustomAudits.AddRange(customAuditEntries);
+            };
         }
 
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
@@ -31,6 +64,8 @@ namespace AuditDemo
         public virtual DbSet<Student> Students { get; set; }
         public virtual DbSet<Course> Courses { get; set; }
         public virtual DbSet<Enrollment> Enrollments { get; set; }
+        public virtual DbSet<CustomAudit> CustomAudits { get; set; }
+        public virtual DbSet<SchoolStatistic> SchoolStatistics { get; set; }
 
     }
 
@@ -66,6 +101,28 @@ namespace AuditDemo
         public virtual Course Course { get; set; }
         public virtual Student Student { get; set; }
 
+    }
+
+    public class SchoolStatistic
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        public int StudentCount { get; set; }
+        public int EnrolmentCount { get; set; }
+    }
+
+    public class CustomAudit
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+        public string EntitySetName { get; set; }
+        public string EntityTypeName { get; set; }
+        public string StateName { get; set; }
+        public string CreatedBy { get; set; }
+        public DateTime CreatedDate { get; set; }
     }
 
     public class SchoolDBIni<T> : DropCreateDatabaseAlways<School>
@@ -121,6 +178,9 @@ namespace AuditDemo
             foreach (Course c in courses)
                 context.Courses.Add(c);
 
+            context.SchoolStatistics.Add(new SchoolStatistic() {
+                StudentCount = 3,
+                EnrolmentCount = 0 });
 
             base.Seed(context);
         }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Z.EntityFramework.Plus;
 
 namespace AuditDemo
 {
@@ -12,8 +13,25 @@ namespace AuditDemo
         {
             using(var context = new School())
             {
-                Console.Write(context.Students.Count());
-                context.SaveChanges();
+
+                var newStudent = context.Students.Add(new Student()
+                {
+                    FirstName = "New",
+                    LastName ="Student"
+                });
+
+                context.Enrollments.Add(new Enrollment()
+                {
+                    Course = context.Courses.First(),
+                    Student = newStudent,
+                    EnrollmentDate = DateTime.Now
+                });
+
+                var audit = new Audit();
+                audit.CreatedBy = "ZZZ Projects"; // Optional
+                context.SaveChanges(audit);
+
+                
             }
         }
     }
